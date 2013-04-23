@@ -72,6 +72,14 @@ def GrabaCentro(self,centro):
     except Exception, e:
         self.stdout.write("Centro ya existe")
 
+def CodigoEstado(estado):   
+    codigo=os.path.basename(estado.get('href'))[4:10]
+    return int(codigo[0:2])
+
+def CodigoMunicipio(municipio):   
+    codigo=os.path.basename(municipio.get('href'))[4:10]
+    return int(codigo[2:4])
+
 def GrabaMesa(self,mesa):
     self.stdout.write(colored(" %s - (%s)- %s" % (mesa.getText(),os.path.basename(mesa.get('href'))[4:16], mesa.get('href').replace("../../",dir_ele)),'yellow'))
     m=Mesa()
@@ -137,33 +145,50 @@ def GrabaMesa(self,mesa):
 
 
 class Command(BaseCommand)  :
-    args = '<ninguno>'
+    args = '<#estado>, <#municipio> comenzar a buscar desde el Estado y municipo'
     help = 'Carga Informacion desde el Cne a la Base de Datos'
 
     def handle(self, *args, **options):
-        
+        comenzarEstado=0
+        comenzarMunicipo=0
+
+        if len(args)> 0 :
+            comenzarEstado=int(args[0])
+        if len(args)>1 :
+            comenzarMunicipo=int(args[1])
+
         estados=traeRegion(dir_ele+"r/1/reg_000000.html?")
         #Grabando Estados
+        ce=0
         for estado in estados:
-            GrabaRegion(self,estado)
-            municipios=traeRegion(str(estado.get('href').replace("../../",dir_ele)))
-            for municipio in municipios:
-                GrabaRegion(self,municipio)
-                if int(os.path.basename(municipio.get('href'))[4:6])<90:
-                    parroquias=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
-                    for parroquia in parroquias:
-                        GrabaRegion(self,parroquia)
-                        centros=traeRegion(str(parroquia.get('href').replace("../../",dir_ele)))
-                        for centro in centros:
-                            GrabaCentro(self,centro)
-                            mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
-                            for mesa in mesas:
-                                GrabaMesa(self,mesa)
-                else:
-                    #Es un Centro Inhospito o fuera del pais
-                    centros=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
-                    for centro in centros:
-                        GrabaCentro(self,centro)
-                        mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
-                        for mesa in mesas:
-                            GrabaMesa(self,mesa)
+            ce=ce+1
+            if comenzarEstado==0 or ce>=comenzarEstado:
+                GrabaRegion(self,estado)
+                municipios=traeRegion(str(estado.get('href').replace("../../",dir_ele)))
+                cm=0
+                for municipio in municipios:
+                    cm=cm+1
+                    if comenzarMunicipo==0 or cm>=comenzarMunicipo:
+                        GrabaRegion(self,municipio)
+                        if int(os.path.basename(municipio.get('href'))[4:6])<90:
+                            parroquias=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
+                            for parroquia in parroquias:
+                                GrabaRegion(self,parroquia)
+                                centros=traeRegion(str(parroquia.get('href').replace("../../",dir_ele)))
+                                for centro in centros:
+                                    GrabaCentro(self,centro)
+                                    mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
+                                    for mesa in mesas:
+                                        GrabaMesa(self,mesa)
+                        else:
+                            #Es un Centro Inhospito o fuera del pais
+                            centros=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
+                            for centro in centros:
+                                GrabaCentro(self,centro)
+                                mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
+                                for mesa in mesas:
+                                    GrabaMesa(self,mesa)
+                    else:
+                        print("Saltado el Municipio %i" % CodigoMunicipio(municipio))
+            else:
+                print("Saltado el Estado %i" % CodigoEstado(estado))
