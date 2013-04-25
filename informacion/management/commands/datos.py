@@ -12,9 +12,9 @@ def traeRegion(link):
     pagina=html()
     intentos=0
     while True:
-        pagina.html_connect(link)
-        intentos=intentos+1
         try:
+            pagina.html_connect(link)
+            intentos=intentos+1
             if pagina.status==200:
                 pagina.html_read()
                 soup = BeautifulSoup(pagina.html_showHTML())
@@ -34,7 +34,30 @@ def traeRegion(link):
                 print (colored('error cargando datos desde la pagina','red'))
                 raise
 
-
+def traeMesa(link):
+    pagina=html()
+    intentos=0
+    while True:
+        try:      
+            pagina.html_connect(link)
+            intentos=intentos+1
+            if pagina.status==200:
+                pagina.html_read()
+                return  BeautifulSoup(pagina.html_showHTML())
+            else:
+                 print colored('Error: Servidor No devuelve datos intento %i' % intentos,'red')
+        except Exception, e:
+            print( colored(" Error de descargando pagina intento %i" % intentos,'red'))
+        if intentos==10:
+            intentos=0
+            while True:
+                si=raw_input('Hay Problemas conectando, intento de nuevo (S/N)')
+                si=si.lower()
+                if si in ["s","n"]:
+                    break
+            if si=='n':
+                print (colored('error cargando datos desde la pagina','red'))
+                raise
 
     
 
@@ -102,41 +125,38 @@ def GrabaMesa(self,mesa):
         print 'Grabando..' 
     
 
-    pagina=html()
-    pagina.html_connect(m.link)
-    if pagina.status==200:
-        pagina.html_read()
-        soup = BeautifulSoup(pagina.html_showHTML())
-        contadorOtros=0
-        if soup.find(id="tablaResultados"):
-            for r in soup.find(id="tablaResultados").find_all(class_='tbsubtotalrow'):
-                t=r.findAll(class_="lightRowContent")
-                nombre=str(t[1].text.replace("Adjudicado","").strip())
-                votos=int(t[2].text)
-             
-                if nombre=='HUGO CHAVEZ':
-                    print ("Oficialismo - (%i)" % votos  )
-                    m.ch=votos
-                elif nombre == 'HENRIQUE CAPRILES RADONSKI':
-                    print ("Oposicion - (%i)" % votos  )
-                    m.op=votos
-                else:
-                    contadorOtros=contadorOtros+votos
-            print ('Otros - (%i)' % contadorOtros) 
-            m.ot=contadorOtros
-            
-            c=0
-            for f in soup.find(id="fichaTecnica").find_all(class_='tblightrow'):
-                c=c+1
-                l=f.findAll("td")          
-                if c==1:
-                    votos=int(l[2].text)
-                    print ("Electores - (%s)" % ( votos ))
-                    m.electores=votos
-                elif c==7:
-                    votos=int(l[2].text)
-                    print ("Votos Nulos - (%s)" % (votos)  )
-                    m.nulos=votos
+  
+    soup = traeMesa(m.link)
+    contadorOtros=0
+    if soup.find(id="tablaResultados"):
+        for r in soup.find(id="tablaResultados").find_all(class_='tbsubtotalrow'):
+            t=r.findAll(class_="lightRowContent")
+            nombre=str(t[1].text.replace("Adjudicado","").strip())
+            votos=int(t[2].text.replace(".",""))
+         
+            if nombre=='HUGO CHAVEZ':
+                print ("Oficialismo - (%i)" % votos  )
+                m.ch=votos
+            elif nombre == 'HENRIQUE CAPRILES RADONSKI':
+                print ("Oposicion - (%i)" % votos  )
+                m.op=votos
+            else:
+                contadorOtros=contadorOtros+votos
+        print ('Otros - (%i)' % contadorOtros) 
+        m.ot=contadorOtros
+        
+        c=0
+        for f in soup.find(id="fichaTecnica").find_all(class_='tblightrow'):
+            c=c+1
+            l=f.findAll("td")          
+            if c==1:
+                votos=int(l[2].text.replace(".",""))
+                print ("Electores - (%s)" % ( votos ))
+                m.electores=votos
+            elif c==7:
+                votos=int(l[2].text)
+                print ("Votos Nulos - (%s)" % (votos)  )
+                m.nulos=votos
     try:
         m.save()
         self.stdout.write("Mesa Grabada")
@@ -168,26 +188,19 @@ class Command(BaseCommand)  :
                 cm=0
                 for municipio in municipios:
                     cm=cm+1
-                    if comenzarMunicipo==0 or cm>=comenzarMunicipo:
+                    if comenzarMunicipo==0 or cm>=comenzarMunicipo or comenzarEstado!=ce:
                         GrabaRegion(self,municipio)
-                        if int(os.path.basename(municipio.get('href'))[4:6])<90:
-                            parroquias=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
-                            for parroquia in parroquias:
-                                GrabaRegion(self,parroquia)
-                                centros=traeRegion(str(parroquia.get('href').replace("../../",dir_ele)))
-                                for centro in centros:
-                                    GrabaCentro(self,centro)
-                                    mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
-                                    for mesa in mesas:
-                                        GrabaMesa(self,mesa)
-                        else:
-                            #Es un Centro Inhospito o fuera del pais
-                            centros=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
+                        
+                        parroquias=traeRegion(str(municipio.get('href').replace("../../",dir_ele)))
+                        for parroquia in parroquias:
+                            GrabaRegion(self,parroquia)
+                            centros=traeRegion(str(parroquia.get('href').replace("../../",dir_ele)))
                             for centro in centros:
                                 GrabaCentro(self,centro)
                                 mesas=traeRegion(str(centro.get('href').replace("../../",dir_ele)))
                                 for mesa in mesas:
                                     GrabaMesa(self,mesa)
+                    
                     else:
                         print("Saltado el Municipio %i" % CodigoMunicipio(municipio))
             else:
